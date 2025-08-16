@@ -4,14 +4,13 @@
 import asyncio
 import json
 import logging
-import sys
-from typing import Optional, Dict, Any, List, Iterable
+from typing import Dict, Any, List
 import uuid
 import base64
 import re
 
 from mcp.server import Server
-from mcp.types import Tool, INTERNAL_ERROR
+from mcp.types import Tool
 
 from .connection import TCPConnection
 
@@ -22,42 +21,47 @@ logger = logging.getLogger(__name__)
 
 class TCPSocketServer:
     """MCP Server for TCP Socket operations."""
-    
+
     def __init__(self):
-        self.server = Server(
-            "TcpSocketMCP",
-            version="1.0.0"
-        )
+        self.server = Server("TcpSocketMCP", version="1.0.0")
         self.connections: Dict[str, TCPConnection] = {}
-        self.pending_triggers: Dict[str, Dict[str, Dict[str, Any]]] = {}  # For pre-registered triggers
+        self.pending_triggers: Dict[
+            str, Dict[str, Dict[str, Any]]
+        ] = {}  # For pre-registered triggers
         self._setup_tools()
-    
+
     def _parse_hex_string(self, hex_str: str) -> bytes:
         """Parse a hex string into bytes. Primary format: plain hex pairs like '48656C6C6F' for 'Hello'.
         Also supports legacy \\xNN format for compatibility."""
         # Remove common hex prefixes and whitespace
-        clean_hex = hex_str.replace("0x", "").replace("0X", "").replace(" ", "").replace("\n", "").replace("\r", "")
-        
+        clean_hex = (
+            hex_str.replace("0x", "")
+            .replace("0X", "")
+            .replace(" ", "")
+            .replace("\n", "")
+            .replace("\r", "")
+        )
+
         # If the string contains \x escape sequences, parse them
         if "\\x" in hex_str:
             # Parse \xNN format
             hex_bytes = bytearray()
             # Find all \xNN patterns
-            pattern = r'\\x([0-9a-fA-F]{2})'
+            pattern = r"\\x([0-9a-fA-F]{2})"
             matches = re.findall(pattern, hex_str)
             for hex_val in matches:
                 hex_bytes.append(int(hex_val, 16))
             # Also include any literal text between hex escapes
-            remaining = re.sub(pattern, '\x00', hex_str)
-            if remaining and remaining != '\x00' * len(matches):
+            remaining = re.sub(pattern, "\x00", hex_str)
+            if remaining and remaining != "\x00" * len(matches):
                 # Mix of hex and literal - parse more carefully
-                parts = re.split(r'(\\x[0-9a-fA-F]{2})', hex_str)
+                parts = re.split(r"(\\x[0-9a-fA-F]{2})", hex_str)
                 hex_bytes = bytearray()
                 for part in parts:
-                    if part.startswith('\\x') and len(part) == 4:
+                    if part.startswith("\\x") and len(part) == 4:
                         hex_bytes.append(int(part[2:], 16))
                     elif part:
-                        hex_bytes.extend(part.encode('utf-8'))
+                        hex_bytes.extend(part.encode("utf-8"))
             return bytes(hex_bytes)
         else:
             # Plain hex string like "48656c6c6f"
@@ -67,10 +71,10 @@ class TCPSocketServer:
                 # If not valid hex, treat as UTF-8
                 logger.warning(f"Invalid hex string, treating as UTF-8: {e}")
                 return hex_str.encode("utf-8")
-    
+
     def _setup_tools(self):
         """Register all MCP tools."""
-        
+
         @self.server.list_tools()
         async def list_tools() -> List[Tool]:
             return [
@@ -101,12 +105,21 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "host": {"type": "string", "description": "Target host address"},
-                            "port": {"type": "integer", "description": "Target port number"},
-                            "connection_id": {"type": "string", "description": "Optional custom connection ID"}
+                            "host": {
+                                "type": "string",
+                                "description": "Target host address",
+                            },
+                            "port": {
+                                "type": "integer",
+                                "description": "Target port number",
+                            },
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Optional custom connection ID",
+                            },
                         },
-                        "required": ["host", "port"]
-                    }
+                        "required": ["host", "port"],
+                    },
                 ),
                 Tool(
                     name="tcp_disconnect",
@@ -127,10 +140,13 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID to close"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID to close",
+                            }
                         },
-                        "required": ["connection_id"]
-                    }
+                        "required": ["connection_id"],
+                    },
                 ),
                 Tool(
                     name="tcp_send",
@@ -152,13 +168,27 @@ Returns: success, connection_id, bytes_sent""",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID from tcp_connect"},
-                            "data": {"type": "string", "description": "Data to send (text, hex pairs, or base64)"},
-                            "encoding": {"type": "string", "enum": ["utf-8", "base64", "hex"], "description": "Data encoding", "default": "utf-8"},
-                            "terminator": {"type": "string", "description": "Optional terminator as hex pairs (e.g., '0D0A' for CRLF)"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID from tcp_connect",
+                            },
+                            "data": {
+                                "type": "string",
+                                "description": "Data to send (text, hex pairs, or base64)",
+                            },
+                            "encoding": {
+                                "type": "string",
+                                "enum": ["utf-8", "base64", "hex"],
+                                "description": "Data encoding",
+                                "default": "utf-8",
+                            },
+                            "terminator": {
+                                "type": "string",
+                                "description": "Optional terminator as hex pairs (e.g., '0D0A' for CRLF)",
+                            },
                         },
-                        "required": ["connection_id", "data"]
-                    }
+                        "required": ["connection_id", "data"],
+                    },
                 ),
                 Tool(
                     name="tcp_read_buffer",
@@ -203,13 +233,27 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"},
-                            "index": {"type": "integer", "description": "Starting index in buffer"},
-                            "count": {"type": "integer", "description": "Number of chunks to read"},
-                            "format": {"type": "string", "enum": ["utf-8", "hex", "base64"], "description": "Output format", "default": "utf-8"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            },
+                            "index": {
+                                "type": "integer",
+                                "description": "Starting index in buffer",
+                            },
+                            "count": {
+                                "type": "integer",
+                                "description": "Number of chunks to read",
+                            },
+                            "format": {
+                                "type": "string",
+                                "enum": ["utf-8", "hex", "base64"],
+                                "description": "Output format",
+                                "default": "utf-8",
+                            },
                         },
-                        "required": ["connection_id"]
-                    }
+                        "required": ["connection_id"],
+                    },
                 ),
                 Tool(
                     name="tcp_clear_buffer",
@@ -235,10 +279,13 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            }
                         },
-                        "required": ["connection_id"]
-                    }
+                        "required": ["connection_id"],
+                    },
                 ),
                 Tool(
                     name="tcp_buffer_info",
@@ -268,10 +315,13 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            }
                         },
-                        "required": ["connection_id"]
-                    }
+                        "required": ["connection_id"],
+                    },
                 ),
                 Tool(
                     name="tcp_set_trigger",
@@ -294,15 +344,40 @@ Returns: success, connection_id, trigger_id, status ("active" or "pending")""",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"},
-                            "trigger_id": {"type": "string", "description": "Unique trigger ID"},
-                            "pattern": {"type": "string", "description": "Regex pattern to match"},
-                            "response": {"type": "string", "description": "Response data to send"},
-                            "response_encoding": {"type": "string", "enum": ["utf-8", "base64", "hex"], "description": "Response encoding", "default": "utf-8"},
-                            "response_terminator": {"type": "string", "description": "Optional terminator as hex pairs"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            },
+                            "trigger_id": {
+                                "type": "string",
+                                "description": "Unique trigger ID",
+                            },
+                            "pattern": {
+                                "type": "string",
+                                "description": "Regex pattern to match",
+                            },
+                            "response": {
+                                "type": "string",
+                                "description": "Response data to send",
+                            },
+                            "response_encoding": {
+                                "type": "string",
+                                "enum": ["utf-8", "base64", "hex"],
+                                "description": "Response encoding",
+                                "default": "utf-8",
+                            },
+                            "response_terminator": {
+                                "type": "string",
+                                "description": "Optional terminator as hex pairs",
+                            },
                         },
-                        "required": ["connection_id", "trigger_id", "pattern", "response"]
-                    }
+                        "required": [
+                            "connection_id",
+                            "trigger_id",
+                            "pattern",
+                            "response",
+                        ],
+                    },
                 ),
                 Tool(
                     name="tcp_remove_trigger",
@@ -329,11 +404,17 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"},
-                            "trigger_id": {"type": "string", "description": "Trigger ID to remove"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            },
+                            "trigger_id": {
+                                "type": "string",
+                                "description": "Trigger ID to remove",
+                            },
                         },
-                        "required": ["connection_id", "trigger_id"]
-                    }
+                        "required": ["connection_id", "trigger_id"],
+                    },
                 ),
                 Tool(
                     name="tcp_connect_and_send",
@@ -361,18 +442,38 @@ Returns: success, connection_id, bytes_sent, immediate_response (if any)""",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "host": {"type": "string", "description": "Target host address"},
-                            "port": {"type": "integer", "description": "Target port number"},
-                            "data": {"type": "string", "description": "Data to send immediately"},
-                            "connection_id": {"type": "string", "description": "Optional custom connection ID"},
-                            "encoding": {"type": "string", "enum": ["utf-8", "base64", "hex"], "description": "Data encoding", "default": "utf-8"},
-                            "terminator": {"type": "string", "description": "Optional terminator as hex pairs"}
+                            "host": {
+                                "type": "string",
+                                "description": "Target host address",
+                            },
+                            "port": {
+                                "type": "integer",
+                                "description": "Target port number",
+                            },
+                            "data": {
+                                "type": "string",
+                                "description": "Data to send immediately",
+                            },
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Optional custom connection ID",
+                            },
+                            "encoding": {
+                                "type": "string",
+                                "enum": ["utf-8", "base64", "hex"],
+                                "description": "Data encoding",
+                                "default": "utf-8",
+                            },
+                            "terminator": {
+                                "type": "string",
+                                "description": "Optional terminator as hex pairs",
+                            },
                         },
-                        "required": ["host", "port", "data"]
-                    }
+                        "required": ["host", "port", "data"],
+                    },
                 ),
                 Tool(
-                    name="tcp_list_connections",  
+                    name="tcp_list_connections",
                     description="""List all active TCP connections with statistics.
 
 ## Information Provided
@@ -390,10 +491,7 @@ Returns: success, connection_id, bytes_sent, immediate_response (if any)""",
 - Monitor resource usage
 - Debug connection issues
 - Get overview of active sessions""",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {}
-                    }
+                    inputSchema={"type": "object", "properties": {}},
                 ),
                 Tool(
                     name="tcp_connection_info",
@@ -436,13 +534,16 @@ Returns error if:
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "connection_id": {"type": "string", "description": "Connection ID"}
+                            "connection_id": {
+                                "type": "string",
+                                "description": "Connection ID",
+                            }
                         },
-                        "required": ["connection_id"]
-                    }
+                        "required": ["connection_id"],
+                    },
                 ),
             ]
-        
+
         @self.server.call_tool()
         async def call_tool(name: str, arguments: Dict[str, Any]):
             """Handle tool calls and return content blocks."""
@@ -474,107 +575,127 @@ Returns error if:
             except Exception as e:
                 logger.error(f"Error in tool {name}: {e}")
                 # Return error as text content
-                return [{
-                    "type": "text",
-                    "text": json.dumps({"error": str(e)})
-                }]
-    
+                return [{"type": "text", "text": json.dumps({"error": str(e)})}]
+
     async def _handle_connect(self, args: Dict[str, Any]):
         """Handle TCP connection request."""
         host = args["host"]
         port = args["port"]
         connection_id = args.get("connection_id", str(uuid.uuid4()))
-        
+
         if connection_id in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "duplicate_id",
-                    "message": f"Connection ID {connection_id} already exists"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "duplicate_id",
+                            "message": f"Connection ID {connection_id} already exists",
+                        }
+                    ),
+                }
+            ]
+
         conn = TCPConnection(connection_id, host, port)
         success = await conn.connect()
-        
+
         if success:
             self.connections[connection_id] = conn
-            
+
             # Apply any pending triggers for this connection
             applied_triggers = []
             if connection_id in self.pending_triggers:
-                for trigger_id, trigger_data in self.pending_triggers[connection_id].items():
-                    conn.add_trigger(trigger_id, trigger_data["pattern"], trigger_data["response"])
+                for trigger_id, trigger_data in self.pending_triggers[
+                    connection_id
+                ].items():
+                    conn.add_trigger(
+                        trigger_id, trigger_data["pattern"], trigger_data["response"]
+                    )
                     applied_triggers.append(trigger_id)
                 # Remove from pending triggers
                 del self.pending_triggers[connection_id]
-            
+
             result = {
                 "success": True,
                 "connection_id": connection_id,
                 "host": host,
                 "port": port,
-                "status": "connected"
+                "status": "connected",
             }
-            
+
             if applied_triggers:
                 result["applied_triggers"] = applied_triggers
-                result["message"] = f"Applied {len(applied_triggers)} pre-registered trigger(s)"
-            
-            return [{
-                "type": "text",
-                "text": json.dumps(result)
-            }]
+                result["message"] = (
+                    f"Applied {len(applied_triggers)} pre-registered trigger(s)"
+                )
+
+            return [{"type": "text", "text": json.dumps(result)}]
         else:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "connection_failed",
-                    "message": f"Failed to connect to {host}:{port}"
-                })
-            }]
-    
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "connection_failed",
+                            "message": f"Failed to connect to {host}:{port}",
+                        }
+                    ),
+                }
+            ]
+
     async def _handle_disconnect(self, args: Dict[str, Any]):
         """Handle disconnection request."""
         connection_id = args["connection_id"]
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         await self.connections[connection_id].disconnect()
         del self.connections[connection_id]
-        
-        return [{
-            "type": "text",
-            "text": json.dumps({
-                "success": True,
-                "connection_id": connection_id,
-                "status": "disconnected"
-            })
-        }]
-    
+
+        return [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "success": True,
+                        "connection_id": connection_id,
+                        "status": "disconnected",
+                    }
+                ),
+            }
+        ]
+
     async def _handle_send(self, args: Dict[str, Any]):
         """Handle sending data."""
         connection_id = args["connection_id"]
         data_str = args["data"]
         encoding = args.get("encoding", "utf-8")
         terminator_str = args.get("terminator")
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         # Convert data based on encoding
         if encoding == "base64":
             data = base64.b64decode(data_str)
@@ -582,116 +703,138 @@ Returns error if:
             data = self._parse_hex_string(data_str)
         else:
             data = data_str.encode("utf-8")
-        
+
         # Add terminator if specified
         if terminator_str:
             terminator = self._parse_hex_string(terminator_str)
             data = data + terminator
-        
+
         conn = self.connections[connection_id]
         success = await conn.send(data)
-        
+
         if success:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "success": True,
-                    "connection_id": connection_id,
-                    "bytes_sent": len(data)
-                })
-            }]
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "success": True,
+                            "connection_id": connection_id,
+                            "bytes_sent": len(data),
+                        }
+                    ),
+                }
+            ]
         else:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "send_failed",
-                    "message": "Failed to send data"
-                })
-            }]
-    
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {"error": "send_failed", "message": "Failed to send data"}
+                    ),
+                }
+            ]
+
     async def _handle_read_buffer(self, args: Dict[str, Any]):
         """Handle reading from buffer."""
         connection_id = args["connection_id"]
         index = args.get("index")
         count = args.get("count")
         format_type = args.get("format", "utf-8")
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         conn = self.connections[connection_id]
         buffer_data = await conn.read_buffer(index, count)
-        
+
         # Format the output
         formatted_data = []
         for chunk in buffer_data:
             if format_type == "hex":
                 formatted_data.append(chunk.hex())
             elif format_type == "base64":
-                formatted_data.append(base64.b64encode(chunk).decode('ascii'))
+                formatted_data.append(base64.b64encode(chunk).decode("ascii"))
             else:  # utf-8
-                formatted_data.append(chunk.decode('utf-8', errors='replace'))
-        
-        return [{
-            "type": "text",
-            "text": json.dumps({
-                "connection_id": connection_id,
-                "chunks": len(formatted_data),
-                "data": formatted_data,
-                "format": format_type
-            })
-        }]
-    
+                formatted_data.append(chunk.decode("utf-8", errors="replace"))
+
+        return [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "connection_id": connection_id,
+                        "chunks": len(formatted_data),
+                        "data": formatted_data,
+                        "format": format_type,
+                    }
+                ),
+            }
+        ]
+
     async def _handle_clear_buffer(self, args: Dict[str, Any]):
         """Handle clearing buffer."""
         connection_id = args["connection_id"]
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         await self.connections[connection_id].clear_buffer()
-        
-        return [{
-            "type": "text",
-            "text": json.dumps({
-                "success": True,
-                "connection_id": connection_id,
-                "buffer_cleared": True
-            })
-        }]
-    
+
+        return [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "success": True,
+                        "connection_id": connection_id,
+                        "buffer_cleared": True,
+                    }
+                ),
+            }
+        ]
+
     async def _handle_buffer_info(self, args: Dict[str, Any]):
         """Handle getting buffer info."""
         connection_id = args["connection_id"]
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         info = await self.connections[connection_id].get_buffer_info()
-        
-        return [{
-            "type": "text",
-            "text": json.dumps(info)
-        }]
-    
+
+        return [{"type": "text", "text": json.dumps(info)}]
+
     async def _handle_set_trigger(self, args: Dict[str, Any]):
         """Handle setting a trigger."""
         connection_id = args["connection_id"]
@@ -700,7 +843,7 @@ Returns error if:
         response_str = args["response"]
         response_encoding = args.get("response_encoding", "utf-8")
         response_terminator_str = args.get("response_terminator")
-        
+
         # Convert response based on encoding
         if response_encoding == "base64":
             response = base64.b64decode(response_str)
@@ -708,160 +851,198 @@ Returns error if:
             response = self._parse_hex_string(response_str)
         else:
             response = response_str.encode("utf-8")
-        
+
         # Add terminator if specified
         if response_terminator_str:
             terminator = self._parse_hex_string(response_terminator_str)
             response = response + terminator
-        
+
         # Check if connection exists
         if connection_id in self.connections:
             # Connection exists, add trigger directly
             conn = self.connections[connection_id]
             conn.add_trigger(trigger_id, pattern, response)
-            
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "success": True,
-                    "connection_id": connection_id,
-                    "trigger_id": trigger_id,
-                    "pattern": pattern,
-                    "status": "active"
-                })
-            }]
+
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "success": True,
+                            "connection_id": connection_id,
+                            "trigger_id": trigger_id,
+                            "pattern": pattern,
+                            "status": "active",
+                        }
+                    ),
+                }
+            ]
         else:
             # Connection doesn't exist, store as pending trigger
             if connection_id not in self.pending_triggers:
                 self.pending_triggers[connection_id] = {}
-            
+
             self.pending_triggers[connection_id][trigger_id] = {
                 "pattern": pattern,
                 "response": response,  # Already encoded
                 "response_str": response_str,  # Keep original for later
                 "response_encoding": response_encoding,
-                "response_terminator_str": response_terminator_str
+                "response_terminator_str": response_terminator_str,
             }
-            
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "success": True,
-                    "connection_id": connection_id,
-                    "trigger_id": trigger_id,
-                    "pattern": pattern,
-                    "status": "pending",
-                    "message": "Trigger pre-registered and will activate when connection is established"
-                })
-            }]
-    
+
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "success": True,
+                            "connection_id": connection_id,
+                            "trigger_id": trigger_id,
+                            "pattern": pattern,
+                            "status": "pending",
+                            "message": "Trigger pre-registered and will activate when connection is established",
+                        }
+                    ),
+                }
+            ]
+
     async def _handle_remove_trigger(self, args: Dict[str, Any]):
         """Handle removing a trigger."""
         connection_id = args["connection_id"]
         trigger_id = args["trigger_id"]
-        
+
         # Check if it's an active connection
         if connection_id in self.connections:
             conn = self.connections[connection_id]
             success = conn.remove_trigger(trigger_id)
-            
+
             if success:
-                return [{
-                    "type": "text",
-                    "text": json.dumps({
-                        "success": True,
-                        "connection_id": connection_id,
-                        "trigger_id": trigger_id,
-                        "status": "removed_active"
-                    })
-                }]
+                return [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "success": True,
+                                "connection_id": connection_id,
+                                "trigger_id": trigger_id,
+                                "status": "removed_active",
+                            }
+                        ),
+                    }
+                ]
             else:
-                return [{
-                    "type": "text",
-                    "text": json.dumps({
-                        "error": "not_found",
-                        "message": f"Trigger {trigger_id} not found on active connection"
-                    })
-                }]
-        
+                return [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "error": "not_found",
+                                "message": f"Trigger {trigger_id} not found on active connection",
+                            }
+                        ),
+                    }
+                ]
+
         # Check if it's a pending trigger
         elif connection_id in self.pending_triggers:
             if trigger_id in self.pending_triggers[connection_id]:
                 del self.pending_triggers[connection_id][trigger_id]
-                
+
                 # Clean up empty pending connection
                 if not self.pending_triggers[connection_id]:
                     del self.pending_triggers[connection_id]
-                
-                return [{
-                    "type": "text",
-                    "text": json.dumps({
-                        "success": True,
-                        "connection_id": connection_id,
-                        "trigger_id": trigger_id,
-                        "status": "removed_pending"
-                    })
-                }]
+
+                return [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "success": True,
+                                "connection_id": connection_id,
+                                "trigger_id": trigger_id,
+                                "status": "removed_pending",
+                            }
+                        ),
+                    }
+                ]
             else:
-                return [{
-                    "type": "text",
-                    "text": json.dumps({
-                        "error": "not_found",
-                        "message": f"Trigger {trigger_id} not found in pending triggers"
-                    })
-                }]
-        
+                return [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "error": "not_found",
+                                "message": f"Trigger {trigger_id} not found in pending triggers",
+                            }
+                        ),
+                    }
+                ]
+
         # Connection doesn't exist at all
         else:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found (neither active nor pending)"
-                })
-            }]
-    
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found (neither active nor pending)",
+                        }
+                    ),
+                }
+            ]
+
     async def _handle_list_connections(self):
         """Handle listing all connections."""
         connections_list = []
         for conn_id, conn in self.connections.items():
             info = await conn.get_buffer_info()
-            connections_list.append({
-                "connection_id": conn_id,
-                "host": conn.host,
-                "port": conn.port,
-                "connected": conn.connected,
-                "bytes_sent": info["bytes_sent"],
-                "bytes_received": info["bytes_received"],
-                "buffer_chunks": info["chunks"],
-                "triggers": len(conn.triggers)
-            })
-        
-        return [{
-            "type": "text",
-            "text": json.dumps({
-                "total_connections": len(connections_list),
-                "connections": connections_list
-            })
-        }]
-    
+            connections_list.append(
+                {
+                    "connection_id": conn_id,
+                    "host": conn.host,
+                    "port": conn.port,
+                    "connected": conn.connected,
+                    "bytes_sent": info["bytes_sent"],
+                    "bytes_received": info["bytes_received"],
+                    "buffer_chunks": info["chunks"],
+                    "triggers": len(conn.triggers),
+                }
+            )
+
+        return [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "total_connections": len(connections_list),
+                        "connections": connections_list,
+                    }
+                ),
+            }
+        ]
+
     async def _handle_connection_info(self, args: Dict[str, Any]):
         """Handle getting detailed connection info."""
         connection_id = args["connection_id"]
-        
+
         if connection_id not in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "not_found",
-                    "message": f"Connection {connection_id} not found"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "not_found",
+                            "message": f"Connection {connection_id} not found",
+                        }
+                    ),
+                }
+            ]
+
         conn = self.connections[connection_id]
         buffer_info = await conn.get_buffer_info()
         triggers = conn.get_triggers()
-        
+
         info = {
             "connection_id": connection_id,
             "host": conn.host,
@@ -869,14 +1050,11 @@ Returns error if:
             "connected": conn.connected,
             "created_at": conn.created_at.isoformat(),
             "buffer": buffer_info,
-            "triggers": triggers
+            "triggers": triggers,
         }
-        
-        return [{
-            "type": "text",
-            "text": json.dumps(info)
-        }]
-    
+
+        return [{"type": "text", "text": json.dumps(info)}]
+
     async def _handle_connect_and_send(self, args: Dict[str, Any]):
         """Handle connecting and immediately sending data."""
         host = args["host"]
@@ -885,42 +1063,54 @@ Returns error if:
         connection_id = args.get("connection_id", str(uuid.uuid4()))
         encoding = args.get("encoding", "utf-8")
         terminator_str = args.get("terminator")
-        
+
         # Check if connection_id already exists
         if connection_id in self.connections:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "duplicate_id",
-                    "message": f"Connection ID {connection_id} already exists"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "duplicate_id",
+                            "message": f"Connection ID {connection_id} already exists",
+                        }
+                    ),
+                }
+            ]
+
         # Create and connect
         conn = TCPConnection(connection_id, host, port)
         success = await conn.connect()
-        
+
         if not success:
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "connection_failed",
-                    "message": f"Failed to connect to {host}:{port}"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "connection_failed",
+                            "message": f"Failed to connect to {host}:{port}",
+                        }
+                    ),
+                }
+            ]
+
         # Store connection
         self.connections[connection_id] = conn
-        
+
         # Apply any pending triggers for this connection
         applied_triggers = []
         if connection_id in self.pending_triggers:
-            for trigger_id, trigger_data in self.pending_triggers[connection_id].items():
-                conn.add_trigger(trigger_id, trigger_data["pattern"], trigger_data["response"])
+            for trigger_id, trigger_data in self.pending_triggers[
+                connection_id
+            ].items():
+                conn.add_trigger(
+                    trigger_id, trigger_data["pattern"], trigger_data["response"]
+                )
                 applied_triggers.append(trigger_id)
             # Remove from pending triggers
             del self.pending_triggers[connection_id]
-        
+
         # Convert data based on encoding
         if encoding == "base64":
             data = base64.b64decode(data_str)
@@ -928,33 +1118,37 @@ Returns error if:
             data = self._parse_hex_string(data_str)
         else:
             data = data_str.encode("utf-8")
-        
+
         # Add terminator if specified
         if terminator_str:
             terminator = self._parse_hex_string(terminator_str)
             data = data + terminator
-        
+
         # Send data immediately
         send_success = await conn.send(data)
-        
+
         if not send_success:
             # Connection failed during send, clean up
             await conn.disconnect()
             del self.connections[connection_id]
-            return [{
-                "type": "text",
-                "text": json.dumps({
-                    "error": "send_failed",
-                    "message": f"Connected but failed to send data to {host}:{port}"
-                })
-            }]
-        
+            return [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {
+                            "error": "send_failed",
+                            "message": f"Connected but failed to send data to {host}:{port}",
+                        }
+                    ),
+                }
+            ]
+
         # Wait a brief moment for any immediate response
         await asyncio.sleep(0.1)
-        
+
         # Check for any immediate data in buffer
         buffer_info = await conn.get_buffer_info()
-        
+
         result = {
             "success": True,
             "connection_id": connection_id,
@@ -963,27 +1157,24 @@ Returns error if:
             "bytes_sent": len(data),
             "status": "connected",
             "immediate_response": buffer_info["chunks"] > 0,
-            "buffer_chunks": buffer_info["chunks"]
+            "buffer_chunks": buffer_info["chunks"],
         }
-        
+
         if applied_triggers:
             result["applied_triggers"] = applied_triggers
-            result["message"] = f"Applied {len(applied_triggers)} pre-registered trigger(s)"
-        
-        return [{
-            "type": "text",
-            "text": json.dumps(result)
-        }]
-    
+            result["message"] = (
+                f"Applied {len(applied_triggers)} pre-registered trigger(s)"
+            )
+
+        return [{"type": "text", "text": json.dumps(result)}]
+
     async def run(self):
         """Run the MCP server."""
         from mcp.server.stdio import stdio_server
-        
+
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
-                read_stream,
-                write_stream,
-                self.server.create_initialization_options()
+                read_stream, write_stream, self.server.create_initialization_options()
             )
 
 

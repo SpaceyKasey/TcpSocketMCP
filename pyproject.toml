@@ -46,3 +46,8 @@ sources = ["src"]
 
 [tool.hatch.version]
 path = "src/TcpSocketMCP/__init__.py"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.9",
+]

@@ -1,0 +1,211 @@
+name: Quality Gates
+
+on:
+  workflow_call:
+    outputs:
+      quality-check:
+        description: "Quality check status"
+        value: ${{ jobs.quality-gates.outputs.status }}
+  workflow_dispatch:
+  schedule:
+    # Run quality gates daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+# Permissions for quality reporting
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+env:
+  MINIMUM_COVERAGE: 80
+  MINIMUM_QUALITY_SCORE: 8.0
+
+jobs:
+  quality-gates:
+    name: Quality Gates Validation
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.quality-check.outputs.status }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e .
+        uv pip install --system pytest pytest-asyncio pytest-cov
+        uv pip install --system ruff mypy bandit safety radon
+    
+    - name: Run comprehensive test suite with coverage
+      run: |
+        uv run pytest tests/ \
+          --cov=src/TcpSocketMCP \
+          --cov-report=term-missing \
+          --cov-report=xml:coverage.xml \
+          --cov-fail-under=${{ env.MINIMUM_COVERAGE }} \
+          --junitxml=test-results.xml \
+          -v
+    
+    - name: Calculate code quality metrics
+      run: |
+        echo "## Code Quality Report" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        # Coverage
+        COVERAGE=$(python -c "
+        import xml.etree.ElementTree as ET
+        tree = ET.parse('coverage.xml')
+        root = tree.getroot()
+        coverage = float(root.attrib['line-rate']) * 100
+        print(f'{coverage:.1f}')
+        ")
+        echo "### Coverage: ${COVERAGE}%" >> quality-report.md
+        echo "- Target: ${{ env.MINIMUM_COVERAGE }}%" >> quality-report.md
+        echo "- Status: $([ "${COVERAGE%.*}" -ge "${{ env.MINIMUM_COVERAGE }}" ] && echo "✅ PASS" || echo "❌ FAIL")" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        # Complexity
+        echo "### Complexity Analysis" >> quality-report.md
+        radon cc src/ --average --show-complexity >> complexity.txt
+        COMPLEXITY=$(radon cc src/ --average | grep "Average complexity:" | awk '{print $3}' | tr -d '()')
+        echo "- Average Complexity: ${COMPLEXITY}" >> quality-report.md
+        echo "- Target: < 6.0" >> quality-report.md
+        echo "- Status: $(python -c "print('✅ PASS' if float('${COMPLEXITY}') < 6.0 else '❌ FAIL')")" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        # Maintainability Index
+        echo "### Maintainability Index" >> quality-report.md
+        radon mi src/ --show >> maintainability.txt
+        MI_SCORE=$(radon mi src/ | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+        echo "- Maintainability Index: ${MI_SCORE}" >> quality-report.md
+        echo "- Target: > ${{ env.MINIMUM_QUALITY_SCORE }}" >> quality-report.md
+        echo "- Status: $(python -c "print('✅ PASS' if float('${MI_SCORE}') > ${{ env.MINIMUM_QUALITY_SCORE }} else '❌ FAIL')")" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        # Store metrics for output
+        echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+        echo "COMPLEXITY=${COMPLEXITY}" >> $GITHUB_ENV
+        echo "MAINTAINABILITY=${MI_SCORE}" >> $GITHUB_ENV
+    
+    - name: Run security analysis
+      run: |
+        echo "### Security Analysis" >> quality-report.md
+        
+        # Bandit security check
+        bandit -r src/ -f json -o bandit-report.json
+        SECURITY_ISSUES=$(python -c "
+        import json
+        with open('bandit-report.json') as f:
+            data = json.load(f)
+        high_issues = len([i for i in data['results'] if i['issue_severity'] == 'HIGH'])
+        print(high_issues)
+        ")
+        
+        echo "- High Severity Issues: ${SECURITY_ISSUES}" >> quality-report.md
+        echo "- Target: 0" >> quality-report.md
+        echo "- Status: $([ "${SECURITY_ISSUES}" -eq "0" ] && echo "✅ PASS" || echo "❌ FAIL")" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        # Dependency vulnerability check
+        echo "### Dependency Security" >> quality-report.md
+        if uv pip freeze | safety check --stdin --json > safety-report.json; then
+          echo "- Status: ✅ PASS (No known vulnerabilities)" >> quality-report.md
+        else
+          VULN_COUNT=$(cat safety-report.json | python -c "import json, sys; print(len(json.load(sys.stdin)))")
+          echo "- Status: ❌ FAIL (${VULN_COUNT} vulnerabilities found)" >> quality-report.md
+        fi
+        
+        echo "SECURITY_ISSUES=${SECURITY_ISSUES}" >> $GITHUB_ENV
+    
+    - name: Generate quality score
+      id: quality-check
+      run: |
+        # Calculate overall quality score
+        SCORE=$(python -c "
+        coverage = float('${COVERAGE}')
+        complexity = float('${COMPLEXITY}')
+        maintainability = float('${MAINTAINABILITY}')
+        security = int('${SECURITY_ISSUES}')
+        
+        # Scoring algorithm
+        cov_score = min(coverage / ${{ env.MINIMUM_COVERAGE }}, 1.0) * 25
+        comp_score = max(0, (6.0 - complexity) / 6.0) * 25
+        maint_score = min(maintainability / 10.0, 1.0) * 25
+        sec_score = 25 if security == 0 else max(0, 25 - security * 5)
+        
+        total = cov_score + comp_score + maint_score + sec_score
+        print(f'{total:.1f}')
+        ")
+        
+        echo "### Overall Quality Score: ${SCORE}/100" >> quality-report.md
+        echo "" >> quality-report.md
+        
+        if (( $(echo "${SCORE} >= 80.0" | bc -l) )); then
+          echo "✅ **QUALITY GATES PASSED**" >> quality-report.md
+          echo "status=pass" >> $GITHUB_OUTPUT
+        else
+          echo "❌ **QUALITY GATES FAILED**" >> quality-report.md
+          echo "status=fail" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "QUALITY_SCORE=${SCORE}" >> $GITHUB_ENV
+    
+    - name: Upload quality reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-reports
+        path: |
+          quality-report.md
+          coverage.xml
+          test-results.xml
+          bandit-report.json
+          safety-report.json
+          complexity.txt
+          maintainability.txt
+    
+    - name: Comment quality report on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('quality-report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## Quality Gates Report\n\n${report}`
+          });
+    
+    - name: Create quality gate summary
+      run: |
+        echo "## Quality Gates Summary" >> $GITHUB_STEP_SUMMARY
+        cat quality-report.md >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Detailed Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "- Test Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+        echo "- Code Complexity: ${COMPLEXITY}" >> $GITHUB_STEP_SUMMARY
+        echo "- Maintainability Index: ${MAINTAINABILITY}" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Issues: ${SECURITY_ISSUES}" >> $GITHUB_STEP_SUMMARY
+        echo "- Overall Score: ${QUALITY_SCORE}/100" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Fail if quality gates don't pass
+      if: steps.quality-check.outputs.status == 'fail'
+      run: |
+        echo "Quality gates failed with score: ${QUALITY_SCORE}/100"
+        exit 1

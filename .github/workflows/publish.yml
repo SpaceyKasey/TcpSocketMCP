@@ -6,14 +6,93 @@ on:
   workflow_dispatch:
     inputs:
       test_pypi:
-        description: 'Publish to TestPyPI instead of PyPI'
+        description: 'Publish to TestPyPI (allowed from any branch) instead of PyPI (main branch only)'
         required: false
         default: false
         type: boolean
 
+# Branch protection: Only production PyPI requires main branch
+# TestPyPI publishing allowed from any branch
+env:
+  PUBLISH_BRANCH: main
+
 jobs:
-  build:
+  # Branch validation: Enforce main for PyPI, allow any branch for TestPyPI
+  check-branch:
+    name: Check Branch Protection
     runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Verify branch requirements
+      run: |
+        CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+        IS_TEST_PYPI="${{ github.event.inputs.test_pypi || 'false' }}"
+        IS_RELEASE="${{ github.event_name == 'release' }}"
+        
+        echo "Current branch: $CURRENT_BRANCH"
+        echo "Required branch for PyPI: ${{ env.PUBLISH_BRANCH }}"
+        echo "Publishing to TestPyPI: $IS_TEST_PYPI"
+        echo "Release event: $IS_RELEASE"
+        
+        # Allow TestPyPI publishing from any branch
+        if [ "$IS_TEST_PYPI" = "true" ]; then
+          echo "✅ TestPyPI publishing allowed from any branch ($CURRENT_BRANCH)"
+          echo "✅ Branch check passed - proceeding with TestPyPI publish"
+          exit 0
+        fi
+        
+        # For production PyPI, require main branch
+        if [ "$CURRENT_BRANCH" != "${{ env.PUBLISH_BRANCH }}" ]; then
+          echo "❌ ERROR: Production PyPI publishing is only allowed from the '${{ env.PUBLISH_BRANCH }}' branch"
+          echo "Current branch is: $CURRENT_BRANCH"
+          echo ""
+          echo "Options:"
+          echo "1. Switch to main branch for production PyPI publishing"
+          echo "2. Use 'test_pypi: true' to publish to TestPyPI from this branch"
+          echo "3. Create a release from the main branch"
+          exit 1
+        fi
+        
+        echo "✅ Production PyPI branch check passed - proceeding with PyPI publish"
+
+  # Ensure CI passes before allowing publish
+  check-ci:
+    name: Check CI Status
+    runs-on: ubuntu-latest
+    needs: check-branch
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    steps:
+    - name: Check CI workflow status
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: workflows } = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'ci.yml',
+            head_sha: context.sha,
+            per_page: 1
+          });
+          
+          if (workflows.workflow_runs.length === 0) {
+            core.setFailed('No CI workflow run found for this commit');
+            return;
+          }
+          
+          const ciRun = workflows.workflow_runs[0];
+          if (ciRun.conclusion !== 'success') {
+            core.setFailed(`CI workflow ${ciRun.conclusion} - cannot publish`);
+            return;
+          }
+          
+          console.log('CI workflow passed - proceeding with publish');
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: check-ci
     steps:
     - uses: actions/checkout@v4
     
