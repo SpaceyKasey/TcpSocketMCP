@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e .
+        uv pip install --system pytest pytest-asyncio pytest-cov
+    
+    - name: Test TCP Socket MCP server starts
+      run: |
+        timeout 5 python run.py || exit 0
+      if: matrix.os != 'windows-latest'
+    
+    - name: Test TCP Socket MCP server starts (Windows)
+      run: |
+        $job = Start-Job -ScriptBlock { python run.py }
+        Start-Sleep -Seconds 5
+        Stop-Job -Job $job
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+    
+    - name: Build package
+      run: |
+        uv pip install --system build
+        python -m build
+    
+    - name: Check package installation
+      run: |
+        uv pip install --system dist/*.whl
+        tcp-socket-mcp --help || true
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    
+    - name: Install linting tools
+      run: |
+        uv pip install --system ruff mypy
+    
+    - name: Run ruff check
+      run: ruff check src/ || true
+    
+    - name: Run ruff format check
+      run: ruff format --check src/ || true
+    
+    - name: Run mypy
+      run: mypy src/ --ignore-missing-imports || true

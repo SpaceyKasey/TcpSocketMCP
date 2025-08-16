@@ -16,6 +16,16 @@ Supports multiple concurrent connections, buffering of response data and trigger
 
 ## Installation & Setup
 
+### Install from PyPI
+
+```bash
+# Install with pip
+pip install tcp-socket-mcp
+
+# Install with uv (recommended)
+uv add tcp-socket-mcp
+```
+
 ### For Claude Desktop
 
 Add the server to your Claude Desktop configuration file:
@@ -23,6 +33,19 @@ Add the server to your Claude Desktop configuration file:
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
+#### Option 1: Using installed package (recommended)
+```json
+{
+  "mcpServers": {
+    "tcp-socket": {
+      "command": "tcp-socket-mcp",
+      "env": {}
+    }
+  }
+}
+```
+
+#### Option 2: From source
 ```json
 {
   "mcpServers": {
@@ -33,6 +56,26 @@ Add the server to your Claude Desktop configuration file:
     }
   }
 }
+```
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/kaseyk/tcp-socket-mcp.git
+cd tcp-socket-mcp
+
+# Install with uv (recommended)
+uv pip install -e .
+
+# Or install with pip
+pip install -e .
+
+# Run the server directly
+python run.py
+
+# Or use the command
+tcp-socket-mcp
 ```
 
 ## Available Tools
