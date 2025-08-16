@@ -91,19 +91,22 @@ jobs:
         radon mi src/ --show >> maintainability.txt
         
         # Parse maintainability - handle both numeric scores and letter grades
-        MI_RAW=$(radon mi src/ | grep -E '(^|:)[A-Z]|[0-9]+\.[0-9]+' | head -1)
+        MI_RAW=$(radon mi src/ --show 2>/dev/null | head -1)
         MI_SCORE=$(python -c "
         import re
         raw = '${MI_RAW}'
-        # Try to extract numeric score first
-        numeric = re.search(r'([0-9]+\.?[0-9]*)', raw)
+        # Try to extract numeric score first (format: filename - A (12.34))
+        numeric = re.search(r'\(([0-9]+\.?[0-9]*)\)', raw)
         if numeric:
             score = float(numeric.group(1))
         else:
-            # Convert letter grade to numeric score
-            grade_map = {'A': 20, 'B': 15, 'C': 10, 'D': 5, 'F': 0}
-            grade = re.search(r'([A-F])', raw)
-            score = grade_map.get(grade.group(1) if grade else 'F', 10)
+            # Convert letter grade to numeric score (format: filename - A)
+            grade_match = re.search(r' - ([A-F])$', raw)
+            if grade_match:
+                grade_map = {'A': 20, 'B': 15, 'C': 10, 'D': 5, 'F': 0}
+                score = grade_map.get(grade_match.group(1), 10)
+            else:
+                score = 10  # Default fallback
         print(score)
         ")
         
