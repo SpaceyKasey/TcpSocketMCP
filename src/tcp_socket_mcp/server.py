@@ -146,6 +146,7 @@ Returns error if:
 **Terminator**: Optional hex suffix like "0D0A" for CRLF
 
 **Important**: For protocols requiring specific line endings (HTTP, SMTP, IRC), use hex encoding to avoid JSON escape issues. Example: "474554202F20485454502F312E310D0A" instead of "GET / HTTP/1.1\r\n"
+**Important**: Only send pairs of hex digits for hex encoding (e.g., "0A" for LF, "0D" for CR) no escaping allowed.
 
 Returns: success, connection_id, bytes_sent""",
                     inputSchema={
@@ -336,7 +337,7 @@ Returns error if:
                 ),
                 Tool(
                     name="tcp_connect_and_send",
-                    description="""Connect and immediately send data in one operation. Useful for protocols that require immediate handshakes or banner grabbing.
+                    description="""Connect and immediately send data in one operation. Useful for protocols that require immediate handshakes or banner grabbing. Also prefer over separate connect/send calls if immediately sending data upon connection (eg http requests).
 
 **Required**: host, port, data
 
@@ -345,6 +346,16 @@ Returns error if:
 **Encoding**: utf-8, hex (recommended for binary), base64
 
 **Terminator**: Optional hex suffix
+
+**Encoding options**:
+- utf-8 (default): Text with JSON escapes (\r\n for CRLF)
+- hex: Plain hex pairs like "48656C6C6F" (recommended for precise byte control)
+- base64: Base64 encoded binary
+
+**Terminator**: Optional hex suffix like "0D0A" for CRLF
+
+**Important**: For protocols requiring specific line endings (HTTP, SMTP, IRC), use hex encoding to avoid JSON escape issues. Example: "474554202F20485454502F312E310D0A" instead of "GET / HTTP/1.1\r\n"
+**Important**: Only send pairs of hex digits for hex encoding (e.g., "0A" for LF, "0D" for CR) no escaping allowed.
 
 Returns: success, connection_id, bytes_sent, immediate_response (if any)""",
                     inputSchema={
