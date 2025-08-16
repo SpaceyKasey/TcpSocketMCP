@@ -1,0 +1,119 @@
+name: Test Status
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+jobs:
+  update-badges:
+    name: Update Test Status Badges
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Download test artifacts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: ${{ github.event.workflow_run.id }},
+          });
+          
+          const coverageArtifact = artifacts.data.artifacts.find(artifact => 
+            artifact.name.includes('test-results-ubuntu-latest-3.11')
+          );
+          
+          if (coverageArtifact) {
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: coverageArtifact.id,
+              archive_format: 'zip',
+            });
+            
+            const fs = require('fs');
+            fs.writeFileSync('coverage-artifact.zip', Buffer.from(download.data));
+          }
+    
+    - name: Extract coverage data
+      run: |
+        if [ -f coverage-artifact.zip ]; then
+          unzip -q coverage-artifact.zip
+          
+          if [ -f coverage.xml ]; then
+            # Extract coverage percentage
+            COVERAGE=$(python3 -c "
+            import xml.etree.ElementTree as ET
+            try:
+                tree = ET.parse('coverage.xml')
+                root = tree.getroot()
+                coverage = float(root.attrib['line-rate']) * 100
+                print(f'{coverage:.0f}')
+            except:
+                print('0')
+            ")
+            echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+          else
+            echo "COVERAGE=0" >> $GITHUB_ENV
+          fi
+        else
+          echo "COVERAGE=0" >> $GITHUB_ENV
+        fi
+    
+    - name: Create status badges
+      run: |
+        mkdir -p .github/badges
+        
+        # Test status badge
+        if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+          TEST_STATUS="passing"
+          TEST_COLOR="brightgreen"
+        else
+          TEST_STATUS="failing"
+          TEST_COLOR="red"
+        fi
+        
+        # Coverage badge
+        COVERAGE=${{ env.COVERAGE }}
+        if [ "${COVERAGE}" -ge "80" ]; then
+          COV_COLOR="brightgreen"
+        elif [ "${COVERAGE}" -ge "60" ]; then
+          COV_COLOR="yellow"
+        else
+          COV_COLOR="red"
+        fi
+        
+        # Generate badge URLs
+        echo "https://img.shields.io/badge/tests-${TEST_STATUS}-${TEST_COLOR}" > .github/badges/tests.url
+        echo "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COV_COLOR}" > .github/badges/coverage.url
+        
+        # Create badge markdown
+        cat > .github/badges/README.md << EOF
+        # Test Status Badges
+        
+        ![Tests](https://img.shields.io/badge/tests-${TEST_STATUS}-${TEST_COLOR})
+        ![Coverage](https://img.shields.io/badge/coverage-${COVERAGE}%25-${COV_COLOR})
+        
+        Last updated: $(date -u)
+        EOF
+    
+    - name: Commit badge updates
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet; then
+          echo "No badge updates needed"
+        else
+          git add .github/badges/
+          git commit -m "Update test status badges [skip ci]" || exit 0
+          git push || exit 0
+        fi

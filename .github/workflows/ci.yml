@@ -7,10 +7,47 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  MINIMUM_COVERAGE: 80
+
 jobs:
+  lint:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    
+    - name: Install linting tools
+      run: |
+        uv pip install --system ruff mypy
+    
+    - name: Run ruff check
+      run: ruff check src/
+    
+    - name: Run ruff format check
+      run: ruff format --check src/
+    
+    - name: Run mypy
+      run: mypy src/ --ignore-missing-imports
+
   test:
+    name: Test (Python ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: lint
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.10', '3.11', '3.12']
@@ -34,6 +71,43 @@ jobs:
         uv pip install --system -e .
         uv pip install --system pytest pytest-asyncio pytest-cov
     
+    - name: Run comprehensive test suite
+      run: |
+        uv run pytest tests/ \
+          --cov=src/TcpSocketMCP \
+          --cov-report=term-missing \
+          --cov-report=xml:coverage.xml \
+          --cov-report=html:htmlcov \
+          --cov-fail-under=${{ env.MINIMUM_COVERAGE }} \
+          --junitxml=test-results.xml \
+          -v
+    
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+        path: |
+          test-results.xml
+          coverage.xml
+          htmlcov/
+    
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always() && matrix.os == 'ubuntu-latest'
+      with:
+        files: test-results.xml
+        check_name: "Test Results (Python ${{ matrix.python-version }})"
+    
     - name: Test TCP Socket MCP server starts
       run: |
         timeout 5 python run.py || exit 0
@@ -46,19 +120,48 @@ jobs:
         Stop-Job -Job $job
       if: matrix.os == 'windows-latest'
       shell: pwsh
+
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: test
     
-    - name: Build package
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    
+    - name: Install build dependencies
       run: |
         uv pip install --system build
-        python -m build
     
-    - name: Check package installation
+    - name: Build package
+      run: python -m build
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    
+    - name: Test package installation
       run: |
         uv pip install --system --find-links dist TcpSocketMCP
-        TcpSocketMCP --help || true
+        TcpSocketMCP --help
 
-  lint:
+  test-package:
+    name: Test Installed Package
     runs-on: ubuntu-latest
+    needs: build
     
     steps:
     - uses: actions/checkout@v4
@@ -71,15 +174,80 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v3
     
-    - name: Install linting tools
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    
+    - name: Install package from wheel
       run: |
-        uv pip install --system ruff mypy
+        uv pip install --system --find-links dist TcpSocketMCP
     
-    - name: Run ruff check
-      run: ruff check src/ || true
+    - name: Test installed package
+      run: |
+        # Test CLI entry point
+        TcpSocketMCP --help
+        
+        # Test package import
+        python -c "import TcpSocketMCP; print('Package import successful')"
+        
+        # Test server can be imported and instantiated
+        python -c "
+        from TcpSocketMCP.server import TCPSocketServer
+        server = TCPSocketServer()
+        print('Server instantiation successful')
+        print(f'Server has {len(server.connections)} connections')
+        "
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
     
-    - name: Run ruff format check
-      run: ruff format --check src/ || true
+    steps:
+    - uses: actions/checkout@v4
     
-    - name: Run mypy
-      run: mypy src/ --ignore-missing-imports || true
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    
+    - name: Install security tools
+      run: |
+        uv pip install --system bandit safety
+    
+    - name: Run bandit security linter
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/
+    
+    - name: Check dependencies for security vulnerabilities
+      run: |
+        uv pip freeze | safety check --stdin
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    
+    steps:
+    - name: Download coverage reports
+      uses: actions/download-artifact@v4
+      with:
+        pattern: test-results-ubuntu-latest-*
+        merge-multiple: true
+    
+    - name: Display coverage summary
+      run: |
+        echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "Minimum required coverage: ${{ env.MINIMUM_COVERAGE }}%" >> $GITHUB_STEP_SUMMARY
+        if [ -f coverage.xml ]; then
+          echo "Coverage report generated successfully" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "Coverage report not found" >> $GITHUB_STEP_SUMMARY
+        fi
