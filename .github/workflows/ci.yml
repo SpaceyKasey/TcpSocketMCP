@@ -37,6 +37,7 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
     
     - name: Install linting tools
+      shell: bash
       run: |
         uv pip install --system ruff mypy
     
@@ -74,11 +75,13 @@ jobs:
         cache-dependency-glob: "pyproject.toml"
     
     - name: Install dependencies
+      shell: bash
       run: |
         uv pip install --system -e .
         uv pip install --system pytest pytest-asyncio pytest-cov
     
     - name: Run comprehensive test suite
+      shell: bash
       run: |
         uv run pytest tests/ \
           --cov=src/TcpSocketMCP \
