@@ -1,0 +1,22 @@
+[project]
+name = "tcp-socket-mcp"
+version = "0.1.0"
+description = "MCP server for raw TCP socket access with buffer management"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "TCP Socket MCP", email = "tcp@example.com" }
+]
+dependencies = [
+    "mcp>=1.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+tcp-socket-mcp = "tcp_socket_mcp.server:main_sync"
+
+[tool.hatch.build]
+packages = ["src/tcp_socket_mcp"]
