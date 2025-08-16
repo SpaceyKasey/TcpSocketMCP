@@ -50,16 +50,7 @@ jobs:
           
           if [ -f coverage.xml ]; then
             # Extract coverage percentage
-            COVERAGE=$(python3 -c "
-import xml.etree.ElementTree as ET
-try:
-    tree = ET.parse('coverage.xml')
-    root = tree.getroot()
-    coverage = float(root.attrib['line-rate']) * 100
-    print(f'{coverage:.0f}')
-except:
-    print('0')
-")
+            COVERAGE=$(python3 -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml') if __import__('os').path.exists('coverage.xml') else None; print(int(float(tree.getroot().attrib['line-rate']) * 100) if tree else 0)")
             echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
           else
             echo "COVERAGE=0" >> $GITHUB_ENV
