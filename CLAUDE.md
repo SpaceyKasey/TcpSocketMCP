@@ -29,13 +29,13 @@ python run.py  # Terminal 2: Run MCP server
 
 ### Core Components
 
-**MCP Server Layer** (`src/tcp_socket_mcp/server.py`)
+**MCP Server Layer** (`src/TcpSocketMCP/server.py`)
 - Implements MCP protocol and tool registration
 - Manages connection lifecycle and routing
 - Handles encoding/decoding (UTF-8, hex, base64)
 - Pre-registration system for triggers before connection
 
-**Connection Manager** (`src/tcp_socket_mcp/connection.py`)
+**Connection Manager** (`src/TcpSocketMCP/connection.py`)
 - TCPConnection class with async read loop
 - Buffer management with chunked storage
 - Trigger pattern matching and auto-response
@@ -43,7 +43,7 @@ python run.py  # Terminal 2: Run MCP server
 
 **Entry Points**
 - `run.py`: Direct runner without installation (adds src to path)
-- `src/tcp_socket_mcp/__main__.py`: Package entry point
+- `src/TcpSocketMCP/__main__.py`: Package entry point
 - Both call `server.main_sync()` for stdio MCP transport
 
 ### Key Design Patterns
@@ -78,8 +78,8 @@ Each connection runs `_read_loop()` task that:
 
 Package is configured for PyPI distribution:
 - Build backend: hatchling
-- Package name: tcp-socket-mcp
-- Entry point: tcp-socket-mcp command
+- Package name: TcpSocketMCP
+- Entry point: TcpSocketMCP command
 - Python requirement: >=3.10
 
 ## MCP Integration Points

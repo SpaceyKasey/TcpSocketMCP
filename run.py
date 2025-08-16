@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Now import and run the server
-from tcp_socket_mcp.server import main_sync
+from TcpSocketMCP.server import main_sync
 
 if __name__ == "__main__":
     main_sync()

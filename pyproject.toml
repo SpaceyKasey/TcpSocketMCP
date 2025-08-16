@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "TcpSocketMCP"
-version = "0.1.1"
+version = "0.1.2"
 description = "MCP server for raw TCP socket access with buffer management and triggers"
 readme = "README.md"
 license = "MIT"
@@ -39,10 +39,10 @@ Repository = "https://github.com/SpaceyKasey/TcpSocketMCP/"
 Issues = "https://github.com/SpaceyKasey/TcpSocketMCP/issues"
 
 [project.scripts]
-TcpSocketMCP = "tcp_socket_mcp.server:main_sync"
+TcpSocketMCP = "TcpSocketMCP.server:main_sync"
 
 [tool.hatch.build]
-packages = ["src/tcp_socket_mcp"]
+packages = ["src/TcpSocketMCP"]
 
 [tool.hatch.version]
-path = "src/tcp_socket_mcp/__init__.py"
+path = "src/TcpSocketMCP/__init__.py"

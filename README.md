@@ -20,10 +20,10 @@ Supports multiple concurrent connections, buffering of response data and trigger
 
 ```bash
 # Install with pip
-pip install tcpsocketmcp
+pip install TcpSocketMCP
 
 # Install with uv (recommended)
-uv add tcpsocketmcp
+uv add TcpSocketMCP
 
 # Add to Claude Code (recommended)
 claude mcp add rawtcp -- uvx TcpSocketMCP

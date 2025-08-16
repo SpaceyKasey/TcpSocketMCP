@@ -25,7 +25,7 @@ class TCPSocketServer:
     
     def __init__(self):
         self.server = Server(
-            "tcp-socket-mcp",
+            "TcpSocketMCP",
             version="1.0.0"
         )
         self.connections: Dict[str, TCPConnection] = {}
