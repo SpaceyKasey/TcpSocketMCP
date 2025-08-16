@@ -98,15 +98,38 @@ Send raw data over a TCP connection.
 
 **Parameters:**
 - `connection_id` (string, required): Connection ID
-- `data` (string, required): Data to send
-- `encoding` (string, optional): "utf-8" or "base64" (default: "utf-8")
+- `data` (string, required): Data to send (supports hex escapes with \xNN format)
+- `encoding` (string, optional): "utf-8", "base64", or "hex" (default: "utf-8")
+- `terminator` (string, optional): Hex-formatted terminator bytes to append (e.g., "\x0d\x0a" for CRLF)
 
-**Example:**
+**Examples:**
 ```json
+// UTF-8 text
 {
   "connection_id": "web-conn-1",
   "data": "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
   "encoding": "utf-8"
+}
+
+// Binary data with hex encoding
+{
+  "connection_id": "binary-conn",
+  "data": "\\x00\\x01\\x02\\x03\\xff\\xfe",
+  "encoding": "hex"
+}
+
+// Mixed UTF-8 and hex escapes
+{
+  "connection_id": "mixed-conn",
+  "data": "Hello\\x00World\\x0d\\x0a",
+  "encoding": "hex"
+}
+
+// With terminator for consistent line endings
+{
+  "connection_id": "proto-conn",
+  "data": "COMMAND",
+  "terminator": "\\x0d\\x0a"
 }
 ```
 
@@ -155,16 +178,27 @@ Set up an automatic response when a pattern is received.
 - `trigger_id` (string, required): Unique trigger identifier
 - `pattern` (string, required): Regex pattern to match
 - `response` (string, required): Response data to send when pattern matches
-- `response_encoding` (string, optional): "utf-8" or "base64" (default: "utf-8")
+- `response_encoding` (string, optional): "utf-8", "base64", or "hex" (default: "utf-8")
+- `response_terminator` (string, optional): Hex-formatted terminator bytes to append to response
 
-**Example:**
+**Examples:**
 ```json
+// Text response
 {
   "connection_id": "chat-conn",
   "trigger_id": "ping-pong",
   "pattern": "PING",
   "response": "PONG\r\n",
   "response_encoding": "utf-8"
+}
+
+// Binary response with hex encoding
+{
+  "connection_id": "binary-conn",
+  "trigger_id": "ack",
+  "pattern": "\\x01\\x00",
+  "response": "\\x06\\x00\\x00\\x01",
+  "response_encoding": "hex"
 }
 ```
 

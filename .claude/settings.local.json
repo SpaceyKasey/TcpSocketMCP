@@ -9,7 +9,11 @@
       "Bash(cd:*)",
       "Bash(cd:*)",
       "Bash(cd:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(/Users/kaseykaran/.pyenv/versions/3.12.3/bin/python3 -c \"from mcp import types; print([x for x in dir(types) if ''esource'' in x.lower()])\")",
+      "Bash(/Users/kaseykaran/.pyenv/versions/3.12.3/bin/python3 -c \"from mcp.types import Resource; print(Resource.__doc__); import inspect; print(''\\nInit signature:'', inspect.signature(Resource.__init__))\")",
+      "Bash(/Users/kaseykaran/.pyenv/versions/3.12.3/bin/python3 -c \"\nfrom mcp.types import Resource, TextResourceContents\nr = Resource(uri=''test://example'', name=''Test'', description=''Test resource'', mimeType=''text/plain'')\nprint(''Resource created:'', r)\nprint(''\\nTextResourceContents fields:'')\nimport inspect\nprint(inspect.signature(TextResourceContents.__init__))\n\")"
     ],
     "deny": [],
     "ask": []

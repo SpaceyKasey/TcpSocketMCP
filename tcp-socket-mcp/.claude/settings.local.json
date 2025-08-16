@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__rawtcp__tcp_list_connections",
+      "mcp__rawtcp__tcp_connect",
+      "mcp__rawtcp__tcp_read_buffer",
+      "mcp__rawtcp__tcp_disconnect",
+      "mcp__sequential__sequentialthinking",
+      "mcp__rawtcp__tcp_send",
+      "mcp__rawtcp__tcp_buffer_info",
+      "mcp__rawtcp__tcp_connection_info",
+      "mcp__rawtcp__tcp_connect_and_send"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
