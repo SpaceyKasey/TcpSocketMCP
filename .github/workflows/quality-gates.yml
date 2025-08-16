@@ -89,7 +89,24 @@ jobs:
         # Maintainability Index
         echo "### Maintainability Index" >> quality-report.md
         radon mi src/ --show >> maintainability.txt
-        MI_SCORE=$(radon mi src/ | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+        
+        # Parse maintainability - handle both numeric scores and letter grades
+        MI_RAW=$(radon mi src/ | grep -E '(^|:)[A-Z]|[0-9]+\.[0-9]+' | head -1)
+        MI_SCORE=$(python -c "
+        import re
+        raw = '${MI_RAW}'
+        # Try to extract numeric score first
+        numeric = re.search(r'([0-9]+\.?[0-9]*)', raw)
+        if numeric:
+            score = float(numeric.group(1))
+        else:
+            # Convert letter grade to numeric score
+            grade_map = {'A': 20, 'B': 15, 'C': 10, 'D': 5, 'F': 0}
+            grade = re.search(r'([A-F])', raw)
+            score = grade_map.get(grade.group(1) if grade else 'F', 10)
+        print(score)
+        ")
+        
         echo "- Maintainability Index: ${MI_SCORE}" >> quality-report.md
         echo "- Target: > ${{ env.MINIMUM_QUALITY_SCORE }}" >> quality-report.md
         echo "- Status: $(python -c "print('✅ PASS' if float('${MI_SCORE}') > ${{ env.MINIMUM_QUALITY_SCORE }} else '❌ FAIL')")" >> quality-report.md
@@ -135,19 +152,22 @@ jobs:
       run: |
         # Calculate overall quality score
         SCORE=$(python -c "
-        coverage = float('${COVERAGE}')
-        complexity = float('${COMPLEXITY}')
-        maintainability = float('${MAINTAINABILITY}')
-        security = int('${SECURITY_ISSUES}')
-        
-        # Scoring algorithm
-        cov_score = min(coverage / ${{ env.MINIMUM_COVERAGE }}, 1.0) * 25
-        comp_score = max(0, (6.0 - complexity) / 6.0) * 25
-        maint_score = min(maintainability / 10.0, 1.0) * 25
-        sec_score = 25 if security == 0 else max(0, 25 - security * 5)
-        
-        total = cov_score + comp_score + maint_score + sec_score
-        print(f'{total:.1f}')
+        try:
+            coverage = float('${COVERAGE}' or '0')
+            complexity = float('${COMPLEXITY}' or '0')
+            maintainability = float('${MAINTAINABILITY}' or '0')
+            security = int('${SECURITY_ISSUES}' or '0')
+            
+            # Scoring algorithm (0-100 scale)
+            cov_score = min(coverage / ${{ env.MINIMUM_COVERAGE }}, 1.0) * 25
+            comp_score = max(0, (6.0 - complexity) / 6.0) * 25
+            maint_score = min(maintainability / 20.0, 1.0) * 25  # Adjusted for 0-20 scale
+            sec_score = 25 if security == 0 else max(0, 25 - security * 5)
+            
+            total = cov_score + comp_score + maint_score + sec_score
+            print(f'{total:.1f}')
+        except (ValueError, TypeError) as e:
+            print('0.0')  # Fallback score
         ")
         
         echo "### Overall Quality Score: ${SCORE}/100" >> quality-report.md
