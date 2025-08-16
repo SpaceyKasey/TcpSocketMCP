@@ -1,118 +1,151 @@
 # TCP Socket MCP Server
 
-A Model Context Protocol (MCP) server that provides raw TCP socket access for AI models to interact with network services.
+A Model Context Protocol (MCP) server that provides raw TCP socket access, enabling AI models to interact directly with network services using raw TCP Sockets.
+Supports multiple concurrent connections, buffering of response data and triggering automatic responses.
 
-## Installation
+## Demo
 
-```bash
-# Add to Claude Desktop configuration
-./add_to_claude.sh
+![Demo 1](assets/Demo1.gif)
+*Interrogating a device to figure out what it is*
 
-# Or manually run
-python run.py
-```
+![Demo 2](assets/Demo2.gif)
+*Sending data to the device*
 
-## Quick Start for AI Models
+![Output Example](assets/output.jpg)
+*Sample output from TCP interactions*
 
-### Basic Workflow
+## Installation & Setup
 
-```python
-# 1. Connect to a service
-tcp_connect("example.com", 80) → returns connection_id
+### For Claude Desktop
 
-# 2. Send data (use hex for precise control)
-tcp_send(connection_id, "474554202F", encoding="hex")  # GET /
+Add the server to your Claude Desktop configuration file:
 
-# 3. Read response
-tcp_read_buffer(connection_id) → returns received data
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-# 4. Close connection
-tcp_disconnect(connection_id)
+```json
+{
+  "mcpServers": {
+    "tcp-socket": {
+      "command": "python",
+      "args": ["/path/to/tcp-socket-mcp/run.py"],
+      "env": {}
+    }
+  }
+}
 ```
 
 ## Available Tools
 
-### tcp_connect
+Once configured via MCP, the following tools become available to the AI model:
+
+### Core Connection Tools
+
+#### tcp_connect
 Opens a TCP connection to any host:port
-- Returns a connection_id for subsequent operations
+- Returns a `connection_id` for subsequent operations
 - Supports custom connection_id for pre-registered triggers
+- Example: `tcp_connect("example.com", 80)`
 
-### tcp_send  
+#### tcp_send  
 Sends data over an established connection
-- **Encoding options**: utf-8, hex (recommended), base64
-- **Hex format**: Plain pairs like "48656C6C6F" for "Hello"
-- **Terminator**: Optional hex suffix like "0D0A" for CRLF
+- **Encoding options**: `utf-8`, `hex` (recommended for binary), `base64`
+- **Hex format**: Plain pairs like `"48656C6C6F"` for "Hello"
+- **Terminator**: Optional hex suffix like `"0D0A"` for CRLF
 
-### tcp_read_buffer
+#### tcp_read_buffer
 Reads received data from connection buffer
 - Data may not be immediately available after sending
-- Try multiple reads with small delays
-- Supports index/count for partial reads
+- Buffer stores all received data until cleared
+- Supports `index`/`count` for partial reads
+- Format options: `utf-8`, `hex`, `base64`
 
-### tcp_set_trigger
+#### tcp_disconnect
+Closes connection and frees resources
+- Always close connections when done
+- All triggers automatically removed
+
+### Advanced Features
+
+#### tcp_set_trigger
 Sets automatic responses for pattern matches
-- **Pre-registration**: Can set triggers before connecting
-- Supports regex patterns with capture groups ($1, $2)
+- **Pre-registration**: Set triggers before connecting for immediate activation
+- Supports regex patterns with capture groups (`$1`, `$2`)
 - Response fires automatically when pattern matches
+- Perfect for protocol handshakes (IRC PING/PONG, etc.)
 
-### tcp_connect_and_send
-Combines connect + send for time-sensitive protocols
-- Useful for immediate handshakes
+#### tcp_connect_and_send
+Combines connect + send in one atomic operation
+- Essential for time-sensitive protocols
+- Useful for immediate handshakes or banner grabbing
 - Returns connection_id for further operations
 
-### Helper Tools
-- **tcp_disconnect**: Close connection and free resources
-- **tcp_list_connections**: List all active connections
-- **tcp_connection_info**: Get detailed connection info
-- **tcp_buffer_info**: Check buffer statistics
-- **tcp_clear_buffer**: Clear received data
-- **tcp_remove_trigger**: Remove auto-response trigger
+### Utility Tools
 
-## Important Usage Notes
+- **tcp_list_connections**: View all active connections with statistics
+- **tcp_connection_info**: Get detailed info about specific connection
+- **tcp_buffer_info**: Check buffer statistics without reading data
+- **tcp_clear_buffer**: Clear received data from buffer
+- **tcp_remove_trigger**: Remove specific auto-response trigger
 
-### For Protocols with Line Endings (HTTP, SMTP, IRC)
-**Use hex encoding to avoid JSON escape issues:**
-```python
-# Instead of struggling with \r\n in JSON:
-tcp_send(conn_id, "GET / HTTP/1.1\r\n...")  # Can be problematic
+## Usage Examples
 
-# Use hex encoding:
-tcp_send(conn_id, "474554202F20485454502F312E310D0A", encoding="hex")
-```
-
-### Common Hex Values
-- `0D0A` = CRLF (\r\n) - Used by HTTP, SMTP, IRC
-- `0A` = LF (\n) - Unix line ending  
-- `00` = Null terminator - Binary protocols
-- `20` = Space
-- `0D0A0D0A` = Double CRLF - HTTP header end
-
-### Pre-Registration for Immediate Handshakes
-```python
-# 1. Set trigger before connecting
-tcp_set_trigger("my-conn", "ping-handler", "^PING", "PONG")
-
-# 2. Connect - trigger auto-activates
-tcp_connect("server.com", 6667, connection_id="my-conn")
-```
-
-## Example: HTTP Request
+### Basic TCP Communication
 
 ```python
-# 1. Connect
-conn_id = tcp_connect("httpbin.org", 80)
+# Connect to a service
+conn_id = tcp_connect("example.com", 80)
 
-# 2. Send HTTP request (hex encoded for precise control)
-request_hex = "474554202F676574204854..." # GET /get HTTP/1.1\r\nHost: httpbin.org\r\n\r\n
-tcp_send(conn_id, request_hex, encoding="hex")
+# Send data (hex encoding recommended for protocols)
+tcp_send(conn_id, "474554202F20485454502F312E310D0A", encoding="hex")  # GET / HTTP/1.1\r\n
 
-# 3. Read response (may need to wait/retry)
-await sleep(1)
+# Read response (may need to wait for data)
 response = tcp_read_buffer(conn_id)
 
-# 4. Clean up
+# Clean up
 tcp_disconnect(conn_id)
 ```
+
+### Automated Protocol Handling
+
+```python
+# Pre-register trigger for IRC PING/PONG
+tcp_set_trigger("irc-conn", "ping-handler", "^PING :(.+)", "PONG :$1\r\n")
+
+# Connect with pre-registered triggers
+tcp_connect("irc.server.com", 6667, connection_id="irc-conn")
+# PING responses now happen automatically!
+```
+
+### Working with Binary Protocols
+
+```python
+# Use hex encoding for precise byte control
+tcp_send(conn_id, "0001000400000001", encoding="hex")  # Binary protocol header
+
+# Read response in hex for analysis
+response = tcp_read_buffer(conn_id, format="hex")
+```
+
+## Important Notes
+
+### Hex Encoding for Line Endings
+
+Many text protocols (HTTP, SMTP, IRC) require specific line endings. Use hex encoding to avoid JSON escaping issues:
+
+```python
+# Common hex sequences:
+# 0D0A     = \r\n (CRLF) - HTTP, SMTP, IRC
+# 0A       = \n (LF) - Unix line ending
+# 0D0A0D0A = \r\n\r\n - HTTP header terminator
+# 00       = Null byte - Binary protocols
+```
+
+### Timing Considerations
+
+- Network responses aren't instant - use `tcp_buffer_info` to check for data
+- Consider implementing retry logic with small delays
+- Buffer accumulates all received data - clear when needed
 
 ## License
 
