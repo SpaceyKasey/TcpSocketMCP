@@ -3,18 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tcp-socket-mcp"
+name = "TcpSocketMCP"
 version = "0.1.0"
 description = "MCP server for raw TCP socket access with buffer management and triggers"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [
-    { name = "Kassandra Karan", email = "kaseykaran@icloud.com" }
-]
-maintainers = [
-    { name = "Kassandra Karan", email = "kaseykaran@icloud.com" }
-]
+authors = [{ name = "Kassandra Karan", email = "kaseykaran@icloud.com" }]
+maintainers = [{ name = "Kassandra Karan", email = "kaseykaran@icloud.com" }]
 keywords = [
     "mcp",
     "tcp",
@@ -22,7 +18,7 @@ keywords = [
     "network",
     "protocol",
     "raw-socket",
-    "model-context-protocol"
+    "model-context-protocol",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -35,9 +31,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: System :: Networking",
 ]
-dependencies = [
-    "mcp>=1.1.0",
-]
+dependencies = ["mcp>=1.1.0"]
 
 [project.urls]
 Homepage = "https://github.com/SpaceyKasey/TcpSocketMCP/"
