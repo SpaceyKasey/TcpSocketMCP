@@ -3,13 +3,15 @@
 A Model Context Protocol (MCP) server that provides raw TCP socket access, enabling AI models to interact directly with network services using raw TCP Sockets.
 Supports multiple concurrent connections, buffering of response data and triggering automatic responses.
 
+## Motivation and Context
 Many network services and IoT devices communicate via raw TCP protocols that aren't covered by existing HTTP-based MCP servers. TcpSocketMCP enables:
 
-Direct interaction with embedded devices and IoT systems
-Network protocol debugging and testing
-Legacy system integration without HTTP wrappers
-Protocol reverse engineering and analysis
-Automated responses via trigger patterns (useful for IRC, telnet, custom protocols)
+- Direct interaction with embedded devices and IoT systems
+- Network protocol debugging and testing
+- Legacy system integration without HTTP wrappers
+- Protocol reverse engineering and analysis
+- Automated responses via trigger patterns (useful for IRC, telnet, custom protocols)
+
 This addresses the need for low-level network access that several community members have expressed, particularly for industrial automation, IoT development, and network security testing scenarios.
 
 ## Demo
