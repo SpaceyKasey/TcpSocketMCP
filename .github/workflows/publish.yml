@@ -11,11 +11,39 @@ on:
         default: false
         type: boolean
 
+# Only allow publishing from main branch
+env:
+  PUBLISH_BRANCH: main
+
 jobs:
+  # Block publishing from non-main branches
+  check-branch:
+    name: Check Branch Protection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Verify main branch
+      run: |
+        CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+        echo "Current branch: $CURRENT_BRANCH"
+        echo "Required branch: ${{ env.PUBLISH_BRANCH }}"
+        
+        if [ "$CURRENT_BRANCH" != "${{ env.PUBLISH_BRANCH }}" ]; then
+          echo "❌ ERROR: Publishing is only allowed from the '${{ env.PUBLISH_BRANCH }}' branch"
+          echo "Current branch is: $CURRENT_BRANCH"
+          echo "Please create a release from the main branch or switch to main before manual publish"
+          exit 1
+        fi
+        
+        echo "✅ Branch check passed - proceeding with publish"
+
   # Ensure CI passes before allowing publish
   check-ci:
     name: Check CI Status
     runs-on: ubuntu-latest
+    needs: check-branch
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     steps:
     - name: Check CI workflow status
