@@ -11,6 +11,13 @@ on:
     # Run quality gates daily at 2 AM UTC
     - cron: '0 2 * * *'
 
+# Permissions for quality reporting
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
 env:
   MINIMUM_COVERAGE: 80
   MINIMUM_QUALITY_SCORE: 8.0

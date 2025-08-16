@@ -7,6 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Permissions for GitHub Actions
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: read
+
 env:
   MINIMUM_COVERAGE: 80
 
@@ -107,6 +114,7 @@ jobs:
       with:
         files: test-results.xml
         check_name: "Test Results (Python ${{ matrix.python-version }})"
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Test TCP Socket MCP server starts
       run: |
