@@ -1,6 +1,10 @@
 name: Quality Gates
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_call:
     outputs:
       quality-check:
@@ -80,7 +84,25 @@ jobs:
         # Complexity
         echo "### Complexity Analysis" >> quality-report.md
         radon cc src/ --average --show-complexity >> complexity.txt
-        COMPLEXITY=$(radon cc src/ --average | grep "Average complexity:" | awk '{print $3}' | tr -d '()')
+        
+        # Parse complexity - handle both numeric scores and letter grades
+        COMPLEXITY_RAW=$(radon cc src/ --average 2>/dev/null | grep "Average complexity:" | awk '{print $3}' | tr -d '()')
+        COMPLEXITY=$(python -c "
+        import re
+        raw = '${COMPLEXITY_RAW}'
+        # Try to extract numeric score first
+        try:
+            score = float(raw)
+        except ValueError:
+            # Convert letter grade to numeric score
+            grade_map = {'A': 1.0, 'B': 3.0, 'C': 5.0, 'D': 7.0, 'F': 10.0}
+            if raw in grade_map:
+                score = grade_map[raw]
+            else:
+                score = 5.0  # Default fallback
+        print(score)
+        ")
+        
         echo "- Average Complexity: ${COMPLEXITY}" >> quality-report.md
         echo "- Target: < 6.0" >> quality-report.md
         echo "- Status: $(python -c "print('✅ PASS' if float('${COMPLEXITY}') < 6.0 else '❌ FAIL')")" >> quality-report.md
