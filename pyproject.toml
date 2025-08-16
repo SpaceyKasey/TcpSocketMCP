@@ -39,7 +39,7 @@ Repository = "https://github.com/SpaceyKasey/TcpSocketMCP/"
 Issues = "https://github.com/SpaceyKasey/TcpSocketMCP/issues"
 
 [project.scripts]
-tcp-socket-mcp = "tcp_socket_mcp.server:main_sync"
+TcpSocketMCP = "tcp_socket_mcp.server:main_sync"
 
 [tool.hatch.build]
 packages = ["src/tcp_socket_mcp"]

@@ -5,13 +5,13 @@ Supports multiple concurrent connections, buffering of response data and trigger
 
 ## Demo
 
-![Demo 1](assets/Demo1.gif)
+![Demo 1](https://raw.githubusercontent.com/SpaceyKasey/TcpSocketMCP/main/assets/Demo1.gif)
 *Interrogating a device to figure out what it is*
 
-![Demo 2](assets/Demo2.gif)
+![Demo 2](https://raw.githubusercontent.com/SpaceyKasey/TcpSocketMCP/main/assets/Demo2.gif)
 *Sending data to the device*
 
-![Output Example](assets/output.jpg)
+![Output Example](https://raw.githubusercontent.com/SpaceyKasey/TcpSocketMCP/main/assets/output.jpg)
 *Sample output from TCP interactions*
 
 ## Installation & Setup
@@ -20,10 +20,13 @@ Supports multiple concurrent connections, buffering of response data and trigger
 
 ```bash
 # Install with pip
-pip install tcp-socket-mcp
+pip install tcpsocketmcp
 
 # Install with uv (recommended)
-uv add tcp-socket-mcp
+uv add tcpsocketmcp
+
+# Add to Claude Code (recommended)
+claude mcp add rawtcp -- uvx TcpSocketMCP
 ```
 
 ### For Claude Desktop
@@ -38,7 +41,7 @@ Add the server to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "tcp-socket": {
-      "command": "tcp-socket-mcp",
+      "command": "TcpSocketMCP",
       "env": {}
     }
   }
@@ -75,7 +78,7 @@ pip install -e .
 python run.py
 
 # Or use the command
-tcp-socket-mcp
+TcpSocketMCP
 ```
 
 ## Available Tools
