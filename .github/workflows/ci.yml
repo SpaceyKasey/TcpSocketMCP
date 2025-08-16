@@ -54,8 +54,8 @@ jobs:
     
     - name: Check package installation
       run: |
-        uv pip install --system dist/*.whl
-        tcp-socket-mcp --help || true
+        uv pip install --system dist/tcpsocketmcp-*.whl
+        TcpSocketMCP --help || true
 
   lint:
     runs-on: ubuntu-latest
