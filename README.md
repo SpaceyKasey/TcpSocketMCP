@@ -4,6 +4,7 @@
 [![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)](https://github.com/SpaceyKasey/TcpSocketMCP/actions/workflows/ci.yml)
 [![Quality Gates](https://github.com/SpaceyKasey/TcpSocketMCP/workflows/Quality%20Gates/badge.svg)](https://github.com/SpaceyKasey/TcpSocketMCP/actions/workflows/quality-gates.yml)
 [![PyPI version](https://badge.fury.io/py/TcpSocketMCP.svg)](https://badge.fury.io/py/TcpSocketMCP)
+[![PyPI Downloads](https://static.pepy.tech/badge/tcpsocketmcp)](https://pepy.tech/projects/tcpsocketmcp)
 [![Python Support](https://img.shields.io/pypi/pyversions/TcpSocketMCP.svg)](https://pypi.org/project/TcpSocketMCP/)
 
 A Model Context Protocol (MCP) server that provides raw TCP socket access, enabling AI models to interact directly with network services using raw TCP Sockets.
